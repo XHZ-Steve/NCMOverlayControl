@@ -2,10 +2,12 @@
 <main class="preferences"><header><strong>NCM Overlay Control</strong><a href="/">音乐控件</a></header>
 <section class="address-row"><a id="control-url" href="/">本机地址</a><button id="copy" type="button">复制</button></section>
 <form id="preferences" novalidate>
+<p class="debug-notice">网易云需以调试模式启动，才能连接此控件。</p>
 <div class="port-grid"><div><label for="web-port">网页端口</label><input id="web-port" type="number" min="1" max="65535" step="1" required aria-describedby="web-error"><p id="web-error" class="field-error"></p></div><div><label for="debug-port">网易云调试端口</label><input id="debug-port" type="number" min="1" max="65535" step="1" required aria-describedby="debug-error"><p id="debug-error" class="field-error"></p></div></div>
 <label class="toggle-row" for="fallback"><span>媒体键无响应时兜底</span><input id="fallback" type="checkbox" role="switch"></label>
 <label for="ncm-path">网易云路径</label><div class="path-row"><input id="ncm-path" type="text" placeholder="cloudmusic.exe" autocomplete="off"><button id="detect" type="button">查找</button></div>
-<label class="toggle-row" for="auto-debug"><span>启动时自动连接网易云</span><input id="auto-debug" type="checkbox" role="switch"></label>
-<div class="preference-actions"><button id="save" type="submit">保存</button><button id="connect" type="button">启动 / 重连网易云</button></div>
+<label class="toggle-row" for="auto-debug"><span>始终使用调试模式启动网易云<small>控件运行期间生效</small></span><input id="auto-debug" type="checkbox" role="switch"></label>
+<label class="toggle-row" for="show-settings"><span>启动应用时显示设置界面</span><input id="show-settings" type="checkbox" role="switch" checked></label>
+<div class="preference-actions"><button id="connect" type="button">以调试模式启动网易云</button><button id="save" type="submit">保存</button></div>
 </form><p id="settings-status" role="status" aria-live="polite"></p>
-<footer><a href="https://github.com/XHZ-Steve" target="_blank" rel="noopener noreferrer">XHZ_Steve</a><a href="/licenses" target="_blank">开源许可</a><span>v0.1.0</span></footer></main></body></html>
+<footer><a href="https://github.com/XHZ-Steve" target="_blank" rel="noopener noreferrer">XHZ_Steve</a><a href="/licenses" target="_blank">开源许可</a><span>v0.1.1</span></footer></main></body></html>

@@ -8,6 +8,7 @@ pub struct Settings {
     pub fallback: bool,
     pub ncm_path: String,
     pub auto_debug: bool,
+    pub show_settings: bool,
 }
 impl Default for Settings {
     fn default() -> Self {
@@ -17,15 +18,29 @@ impl Default for Settings {
             fallback: true,
             ncm_path: String::new(),
             auto_debug: false,
+            show_settings: true,
         }
     }
 }
 impl Settings {
     pub fn json(&self) -> Value {
-        json!({"webPort":self.web_port,"debugPort":self.debug_port,"fallback":self.fallback,"ncmPath":self.ncm_path,"autoDebug":self.auto_debug})
+        json!({"webPort":self.web_port,"debugPort":self.debug_port,"fallback":self.fallback,"ncmPath":self.ncm_path,"autoDebug":self.auto_debug,"showSettings":self.show_settings})
     }
     pub fn parse(v: &Value) -> Result<Self, String> {
-        if v.as_object().is_none_or(|o| o.len() != 5) {
+        if v.as_object().is_none_or(|o| {
+            o.len() != 5 + usize::from(o.contains_key("showSettings"))
+                || o.keys().any(|k| {
+                    ![
+                        "webPort",
+                        "debugPort",
+                        "fallback",
+                        "ncmPath",
+                        "autoDebug",
+                        "showSettings",
+                    ]
+                    .contains(&k.as_str())
+                })
+        }) {
             return Err("设置格式无效".into());
         }
         let port = |key: &str| {
@@ -41,6 +56,10 @@ impl Settings {
             fallback: v["fallback"].as_bool().ok_or("兜底设置无效")?,
             ncm_path: v["ncmPath"].as_str().ok_or("路径无效")?.trim().to_string(),
             auto_debug: v["autoDebug"].as_bool().ok_or("启动设置无效")?,
+            show_settings: match v.get("showSettings") {
+                None => true,
+                Some(value) => value.as_bool().ok_or("显示设置无效")?,
+            },
         };
         if result.web_port == result.debug_port {
             return Err("两个端口不能相同".into());
@@ -171,6 +190,15 @@ mod tests {
     fn settings_validation() {
         let default = Settings::default();
         assert_eq!(Settings::parse(&default.json()).unwrap(), default);
+        assert!(default.show_settings);
+        let mut legacy = default.json();
+        legacy.as_object_mut().unwrap().remove("showSettings");
+        assert_eq!(Settings::parse(&legacy).unwrap(), default);
+        let mut hidden = default.json();
+        hidden["showSettings"] = json!(false);
+        assert!(!Settings::parse(&hidden).unwrap().show_settings);
+        hidden["showSettings"] = json!("true");
+        assert!(Settings::parse(&hidden).is_err());
         for value in [
             json!(0),
             json!(65536),

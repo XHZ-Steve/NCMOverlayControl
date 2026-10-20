@@ -248,6 +248,12 @@ pub fn run(app: Arc<App>) -> Result<(), String> {
             return Err("无法添加托盘图标".into());
         }
         let mut message = MSG::default();
+        if APP
+            .get()
+            .is_some_and(|app| app.settings.lock().unwrap().show_settings)
+        {
+            PostMessageW(window, OPEN, 0, 0);
+        }
         while GetMessageW(&mut message, std::ptr::null_mut(), 0, 0) > 0 {
             TranslateMessage(&message);
             DispatchMessageW(&message);
@@ -279,7 +285,10 @@ mod tests {
         });
         let server = Arc::new(tiny_http::Server::http(("127.0.0.1", 0)).unwrap());
         let app = Arc::new(App {
-            settings: Mutex::new(Settings::default()),
+            settings: Mutex::new(Settings {
+                show_settings: false,
+                ..Settings::default()
+            }),
             tx,
             shared: Arc::new(Shared {
                 state: Mutex::new(Value::Null),

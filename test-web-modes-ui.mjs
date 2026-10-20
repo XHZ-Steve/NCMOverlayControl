@@ -5,12 +5,14 @@ import {fileURLToPath} from 'node:url';
 import assert from 'node:assert/strict';
 const require=createRequire(import.meta.url);
 const playwright=require(process.env.OM_PLAYWRIGHT_PATH||'playwright');
-const commands=[];let state;
+const commands=[];let state;let ncmRunning=true,connects=0;
 const regularChoices=['屏蔽歌曲：Novacaine','屏蔽音乐人：Loyalemyx','屏蔽音乐人：Shiloh Dynasty','减少风格：嘻哈说唱','不感兴趣','总是推这首歌','盗版翻唱','听感不适'];
 let feedbackChoices=regularChoices;
 const server=createServer(async(request,response)=>{
  response.setHeader('Content-Type','application/json; charset=utf-8');
  if(request.url==='/session'){response.end(JSON.stringify({token:'test'}));return;}
+ if(request.url==='/api/ncm-status'){response.end(JSON.stringify({running:ncmRunning}));return;}
+ if(request.url==='/api/connect'){connects++;response.end('{"ok":true}');return;}
  if(request.url==='/command'){
    let body='';for await(const chunk of request)body+=chunk;const command=JSON.parse(body);commands.push(command);
    if(command.command==='mode')state={...state,mode:command.value};
@@ -31,8 +33,14 @@ try{
   await context.addInitScript(()=>{window.EventSource=class{close(){}};});
   const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
   await page.goto('http://127.0.0.1:'+server.address().port+'/');
+  await page.locator('#quick-connect').waitFor({state:'visible'});
+  const before=connects;page.once('dialog',d=>d.dismiss());await page.locator('#quick-connect').click();assert.equal(connects,before);
+  page.once('dialog',d=>d.accept());await page.locator('#quick-connect').click();await page.waitForFunction(()=>!document.getElementById('quick-connect').disabled);assert.equal(connects,before+1);
+  assert.deepEqual(await page.locator('footer>div').evaluate(e=>[...e.children].map(c=>c.id)),['settings-link','power','exit']);
+  ncmRunning=false;await page.evaluate(()=>{lastNcmCheck=0;return checkNcm();});assert.equal(await page.locator('#quick-connect').isVisible(),false);ncmRunning=true;
   state={connected:true,id:'test',title:'Test',artist:'Artist',mode:'playOrder',volume:50,playing:false,canLike:true,canDislike:true,canAI:false};
   await page.evaluate(s=>render(s),state);
+  assert.equal(await page.locator('#quick-connect').isVisible(),false);
   for(const mode of ['playAi','playFm','playOrder','playCycle','playOneCycle','playRandom']){
    await page.locator('#mode').selectOption(mode);await page.waitForFunction(()=>!document.getElementById('mode').disabled);
    assert.equal(commands.at(-1).command,'mode');assert.equal(commands.at(-1).value,mode);

@@ -8,6 +8,7 @@ function node(id){if(!nodes.has(id))nodes.set(id,{id,dataset:{},value:'',disable
 const commands=['previous','next','toggle','like','dislike','mute'];
 for(const cmd of commands)node(cmd).dataset.command=cmd;
 const context={document:{hidden:true,body:{dataset:{}},getElementById:node,querySelectorAll:selector=>selector.includes('#mode')?[...commands.map(node),node('mode'),node('volume'),node('volume-number')]:commands.map(node),addEventListener(){}},window:{addEventListener(){}},localStorage:{getItem:key=>storage.get(key),setItem:(key,value)=>storage.set(key,value)},AbortController,setTimeout:()=>1,clearTimeout(){},fetch:async(_,options)=>{requests.push(JSON.parse(options.body));return{ok:true,json:async()=>({mediaSent:true,transport:'windows'})};}};
+context.setInterval=()=>1;
 vm.createContext(context);vm.runInContext(readFileSync(new URL('./web/app.js',import.meta.url),'utf8'),context);
 assert.equal(node('transport').value,'windows');
 vm.runInContext("token='test';serviceAvailable=true;render({connected:false,error:'NCM offline'});",context);

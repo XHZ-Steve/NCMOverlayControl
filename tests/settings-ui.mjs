@@ -12,11 +12,23 @@ const server=createServer(async(req,res)=>{
 await new Promise(r=>server.listen(0,'127.0.0.1',r));const browser=await chromium.launch({headless:true,channel:process.env.OM_BROWSER_CHANNEL||'chrome'});mkdirSync(new URL('../test-output/settings/',import.meta.url),{recursive:true});
 try{for(const [width,height] of [[320,480],[440,440],[760,600]]){
  const context=await browser.newContext({viewport:{width,height},reducedMotion:'reduce'}),page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await context.addInitScript(()=>{window.EventSource=class{constructor(){window.settingsEvents=this;}close(){}};});
  await page.goto(`http://127.0.0.1:${server.address().port}/settings`);await page.waitForFunction(()=>!document.getElementById('save').disabled);
  await page.getByLabel('网页端口',{exact:true}).fill('0');await page.getByRole('button',{name:'保存',exact:true}).click();assert.equal(await page.getByLabel('网页端口',{exact:true}).getAttribute('aria-invalid'),'true');
  await page.getByLabel('网页端口',{exact:true}).fill('9222');await page.getByRole('button',{name:'保存',exact:true}).click();assert.match(await page.locator('#debug-error').textContent(),/不能相同/);
  await page.getByLabel('网页端口',{exact:true}).fill('17890');await page.getByRole('button',{name:'查找',exact:true}).click();await page.waitForFunction(()=>!document.getElementById('save').disabled);assert.equal(await page.getByLabel('网易云路径',{exact:true}).inputValue(),'C:\\CloudMusic\\cloudmusic.exe');
  const toggle=page.getByRole('switch',{name:'媒体键无响应时兜底'});await toggle.focus();await page.keyboard.press('Space');await page.getByRole('button',{name:'保存',exact:true}).click();await page.waitForFunction(()=>!document.getElementById('save').disabled);assert.equal(requests.at(-1).value.fallback,await toggle.isChecked());
- const count=requests.length;page.once('dialog',dialog=>dialog.dismiss());await page.getByRole('button',{name:'启动 / 重连网易云',exact:true}).click();assert.equal(requests.length,count,'Cancelling must not restart NCM');
- assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);await page.screenshot({path:new URL(`../test-output/settings/${width}x${height}.png`,import.meta.url).pathname.replace(/^\/([A-Za-z]:)/,'$1'),fullPage:true});assert.deepEqual(errors,[]);await context.close();
+ assert.match(await page.locator('.debug-notice').textContent(),/调试模式/);
+ assert.match(await page.locator('label[for="auto-debug"]').textContent(),/始终使用调试模式启动网易云/);
+ assert.doesNotMatch(await page.locator('body').textContent(),/无需管理员/);
+ const show=page.getByRole('switch',{name:'启动应用时显示设置界面'});assert.equal(await show.isChecked(),true);await show.uncheck();await page.getByRole('button',{name:'保存',exact:true}).click();await page.waitForFunction(()=>!document.getElementById('save').disabled);assert.equal(requests.at(-1).value.showSettings,false);
+ await show.check();await page.getByRole('button',{name:'保存',exact:true}).click();await page.waitForFunction(()=>!document.getElementById('save').disabled);
+ await page.evaluate(()=>settingsEvents.onmessage({data:'{"connected":true}'}));assert.equal(await page.locator('#connect').isDisabled(),true);
+ await page.getByLabel('网易云调试端口',{exact:true}).fill('9333');assert.equal(await page.locator('#connect').isEnabled(),true);
+ await page.getByLabel('网易云调试端口',{exact:true}).fill('9222');assert.equal(await page.locator('#connect').isDisabled(),true);
+ await page.getByRole('button',{name:'保存',exact:true}).click();await page.waitForFunction(()=>!document.getElementById('save').disabled);assert.equal(await page.locator('#connect').isDisabled(),true,'Save must not reenable an already-connected restart button');
+ await page.evaluate(()=>settingsEvents.onerror());assert.equal(await page.locator('#connect').isEnabled(),true);
+ await page.evaluate(()=>settingsEvents.onmessage({data:'{"connected":true}'}));await page.evaluate(()=>settingsEvents.onmessage({data:'{"connected":false}'}));assert.equal(await page.locator('#connect').isEnabled(),true);
+ const count=requests.length;page.once('dialog',dialog=>dialog.dismiss());await page.getByRole('button',{name:'以调试模式启动网易云',exact:true}).click();assert.equal(requests.length,count,'Cancelling must not restart NCM');
+ assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);await page.screenshot({path:new URL(`../test-output/settings/${width}x${height}.png`,import.meta.url).pathname.replace(/^\/([A-Za-z]:)/,'$1'),fullPage:true});const contentHeight=await page.locator('.preferences').evaluate(e=>e.getBoundingClientRect().height);assert.ok(contentHeight<440,`Settings should fit a small desktop window: ${width} wide, ${contentHeight} high`);assert.deepEqual(errors,[]);await context.close();
 }console.log('Settings UI passed: compact layouts, field validation, keyboard switches, path lookup, save, restart cancellation and no overflow.');}finally{await browser.close();await new Promise(r=>server.close(r));}

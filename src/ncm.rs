@@ -25,13 +25,68 @@ fn powershell(script: &str) -> Result<String, String> {
         .map_err(|e| e.to_string())
 }
 pub fn detect() -> Result<String, String> {
-    let value=powershell("$ErrorActionPreference='Stop';[Console]::OutputEncoding=[Text.Encoding]::UTF8;$p=@(Get-CimInstance Win32_Process -Filter \"Name = 'cloudmusic.exe'\" | Where-Object {$_.ExecutablePath} | Select-Object -ExpandProperty ExecutablePath -Unique);if($p.Count -eq 1){[Console]::Write($p[0])}else{exit 1}")?;
+    let mut paths: Vec<String> = processes().into_iter().map(|(_, path)| path).collect();
+    paths.sort_by_key(|p| p.to_lowercase());
+    paths.dedup_by(|a, b| a.eq_ignore_ascii_case(b));
+    if paths.len() != 1 {
+        return Err("请手动填写网易云路径，或先打开网易云再查找".into());
+    }
+    let value = paths.remove(0);
     let settings = Settings {
         ncm_path: value.clone(),
         ..Settings::default()
     };
     Settings::parse(&settings.json())?;
     Ok(value)
+}
+// Native snapshots avoid starting PowerShell merely to check whether NCM is running.
+pub fn processes() -> Vec<(u32, String)> {
+    use windows_sys::Win32::{
+        Foundation::*,
+        System::{Diagnostics::ToolHelp::*, Threading::*},
+    };
+    let mut result = Vec::new();
+    unsafe {
+        let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+        if snapshot == INVALID_HANDLE_VALUE {
+            return result;
+        }
+        let mut entry: PROCESSENTRY32W = std::mem::zeroed();
+        entry.dwSize = std::mem::size_of_val(&entry) as u32;
+        let mut available = Process32FirstW(snapshot, &mut entry);
+        let mut candidates = Vec::new();
+        while available != 0 {
+            let end = entry
+                .szExeFile
+                .iter()
+                .position(|c| *c == 0)
+                .unwrap_or(entry.szExeFile.len());
+            if String::from_utf16_lossy(&entry.szExeFile[..end])
+                .eq_ignore_ascii_case("cloudmusic.exe")
+            {
+                candidates.push((entry.th32ProcessID, entry.th32ParentProcessID));
+            }
+            available = Process32NextW(snapshot, &mut entry);
+        }
+        CloseHandle(snapshot);
+        for (pid, parent) in &candidates {
+            if candidates.iter().any(|(id, _)| id == parent) {
+                continue;
+            }
+            let process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, *pid);
+            if process.is_null() {
+                continue;
+            }
+            let mut path = vec![0u16; 32768];
+            let mut length = path.len() as u32;
+            if QueryFullProcessImageNameW(process, 0, path.as_mut_ptr(), &mut length) != 0 {
+                result.push((*pid, String::from_utf16_lossy(&path[..length as usize])));
+            }
+            CloseHandle(process);
+        }
+    }
+    result.sort_by_key(|(pid, _)| *pid);
+    result
 }
 pub fn connect(settings: &Settings, only_if_needed: bool) -> Result<(), String> {
     if !std::path::Path::new(&settings.ncm_path).is_file() {
@@ -48,6 +103,7 @@ $all=@(Get-CimInstance Win32_Process -Filter "Name = 'cloudmusic.exe'")
 $mains=@($all | Where-Object {{$_.ExecutablePath -eq $exe -and $_.CommandLine -notmatch '(?i)(?:^|\s)--type(?:=|\s)'}})
 if($mains.Count -gt 1){{exit 1}}
 $main=$mains | Select-Object -First 1
+if({only} -and -not $main){{exit 0}}
 if({only} -and $main -and $main.CommandLine -match '(?i)(?:^|\s)--remote-debugging-port(?:=|\s+){port}(?:\s|$)'){{exit 0}}
 $listeners=@(Get-NetTCPConnection -LocalPort {port} -State Listen -ErrorAction SilentlyContinue)
 if(@($listeners | Where-Object {{-not $main -or $_.OwningProcess -ne $main.ProcessId}}).Count){{exit 1}}
@@ -90,6 +146,12 @@ mod tests {
         let script = super::connect_script(&settings, false);
         assert!(script.contains("--remote-debugging-port=9333"));
         assert!(script.contains("O''Brien"));
+        let watched = super::connect_script(&settings, true);
+        assert!(
+            watched.contains("if($true -and -not $main){exit 0}"),
+            "Monitoring must not reopen a process that exited after its snapshot"
+        );
+        assert!(watched.contains("if($true -and $main -and $main.CommandLine"));
         let mut child=std::process::Command::new("powershell.exe").args(["-NoProfile","-NonInteractive","-Command","$s=[Console]::In.ReadToEnd();$t=$null;$e=$null;[System.Management.Automation.Language.Parser]::ParseInput($s,[ref]$t,[ref]$e)|Out-Null;if($e.Count){exit 1}"]).stdin(Stdio::piped()).stdout(Stdio::null()).stderr(Stdio::null()).creation_flags(0x08000000).spawn().unwrap();
         child
             .stdin

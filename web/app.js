@@ -2,6 +2,13 @@
 const $ = id => document.getElementById(id);
 let token, source, state = {connected:false}, busy = false, paused = false, stopped = false, starting = false, reconnect, pendingVolume, volumeRunning = false;
 let transport='windows', serviceAvailable=false;
+let ncmRunning=false,checkingNcm=false,lastNcmCheck=0,connectingNcm=false;
+async function checkNcm(){
+ if(checkingNcm||state.connected||stopped||paused||document.hidden||!serviceAvailable||Date.now()-lastNcmCheck<3000)return;
+ checkingNcm=true;lastNcmCheck=Date.now();
+ try{const r=await fetch('/api/ncm-status',{cache:'no-store'});if(r.ok)ncmRunning=(await r.json()).running===true;}catch{}finally{checkingNcm=false;updateQuickConnect();}
+}
+function updateQuickConnect(){const button=$('quick-connect');button.hidden=state.connected||!ncmRunning||!serviceAvailable||stopped;button.disabled=connectingNcm;}
 try {if(localStorage.getItem('ncmOverlayControl.transport')==='ncm') transport='ncm';} catch {}
 $('transport').value=transport;
 const mediaCommands=new Set(['previous','next','toggle']);
@@ -28,6 +35,7 @@ function render(s) {
  else if(wasModePending&&!s.operationError)$('control-feedback').textContent='播放模式已更新';
  if(s.operationError)error(s.operationError);
  if(!s.connected) error(s.error || '本地服务断开，请确认程序仍在运行');
+ updateQuickConnect();if(!s.connected)checkNcm();
 }
 function stop() {source?.close();source=null;clearTimeout(reconnect);}
 async function start() {
@@ -72,3 +80,10 @@ window.addEventListener('pagehide',stop);window.addEventListener('pageshow',star
 $('dislike-cancel').onclick=()=>{$('dislike-dialog').close();send('dislikeCancel');};
 $('dislike-dialog').addEventListener('cancel',()=>send('dislikeCancel'));
 $('exit').onclick=()=>send('shutdown',undefined,$('exit'));
+$('quick-connect').onclick=async()=>{
+ if(connectingNcm||!confirm('将以调试模式重启网易云，当前播放可能中断。是否继续？'))return;
+ connectingNcm=true;updateQuickConnect();error('正在以调试模式启动网易云…');
+ const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),30000);
+ try{const r=await fetch('/api/connect',{method:'POST',headers:{'Content-Type':'application/json','X-Overlay-Token':token},body:'{}',signal:controller.signal});const result=await r.json();if(!r.ok)throw Error(result.error||'启动失败');error('已启动，正在等待连接…');}catch(e){error(e.message);}finally{clearTimeout(timer);connectingNcm=false;updateQuickConnect();}
+};
+setInterval(checkNcm,5000);

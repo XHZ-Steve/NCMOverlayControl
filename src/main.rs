@@ -647,6 +647,19 @@ fn serve(
     let route = r.url().to_string();
     let path = route.split('?').next().unwrap_or("");
     if r.method() == &Method::Get {
+        if path == "/api/ncm-status" {
+            #[cfg(windows)]
+            let running = !ncm::processes().is_empty();
+            #[cfg(not(windows))]
+            let running = false;
+            response(
+                r,
+                200,
+                "application/json",
+                json!({"running":running}).to_string(),
+            );
+            return;
+        }
         if path == "/api/settings" {
             response(
                 r,
@@ -775,9 +788,14 @@ fn serve(
                 if app.ncm_busy.swap(true, Ordering::SeqCst) {
                     Err("正在连接，请稍候".into())
                 } else {
-                    let settings = app.settings.lock().unwrap().clone();
+                    let mut settings = app.settings.lock().unwrap().clone();
                     #[cfg(windows)]
-                    let result = ncm::connect(&settings, false).map(|_| json!({"ok":true}));
+                    let result = (|| {
+                        if settings.ncm_path.is_empty() {
+                            settings.ncm_path = ncm::detect()?;
+                        }
+                        ncm::connect(&settings, false).map(|_| json!({"ok":true}))
+                    })();
                     #[cfg(not(windows))]
                     let result: Result<Value, String> = Err("仅支持 Windows".into());
                     app.ncm_busy.store(false, Ordering::SeqCst);
@@ -984,10 +1002,37 @@ fn main() {
         headless,
     });
     #[cfg(windows)]
-    if settings.auto_debug && !headless {
-        let settings = settings.clone();
+    if !headless {
+        let app = app.clone();
         thread::spawn(move || {
-            let _ = ncm::connect(&settings, true);
+            let mut previous = None;
+            while !app.stopping.load(Ordering::Relaxed) {
+                let settings = app.settings.lock().unwrap().clone();
+                if settings.auto_debug {
+                    let pids: Vec<u32> = ncm::processes()
+                        .into_iter()
+                        .filter(|(_, path)| path.eq_ignore_ascii_case(&settings.ncm_path))
+                        .map(|(pid, _)| pid)
+                        .collect();
+                    let fingerprint =
+                        (pids.clone(), settings.ncm_path.clone(), settings.debug_port);
+                    if previous.as_ref() != Some(&fingerprint)
+                        && !pids.is_empty()
+                        && !app.ncm_busy.swap(true, Ordering::SeqCst)
+                    {
+                        previous = Some(fingerprint);
+                        if let Err(error) = ncm::connect(&settings, true) {
+                            app.shared.publish(json!({"connected":false,"error":error}));
+                        }
+                        app.ncm_busy.store(false, Ordering::SeqCst);
+                    } else if pids.is_empty() {
+                        previous = None;
+                    }
+                } else {
+                    previous = None;
+                }
+                thread::sleep(Duration::from_secs(3));
+            }
         });
     }
     let app_http = app.clone();
