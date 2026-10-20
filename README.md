@@ -48,12 +48,6 @@ cargo build --release --locked
 ```powershell
 cargo test --locked
 cargo clippy --locked --all-targets -- -D warnings
-npm ci
-npm test
-npm run test:integration
-npx playwright install chromium
-$env:OM_BROWSER_CHANNEL='chromium'
-npm run test:ui
 ```
 
 交互式 Windows 桌面还可运行 `cargo test native_tray_lifecycle -- --ignored --test-threads=1`，检查真实托盘图标注册与退出清理。

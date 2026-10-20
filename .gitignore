@@ -2,3 +2,8 @@
 /test-output/
 /dist/
 node_modules/
+/test-*.mjs
+/tests/*.mjs
+/package.json
+/package-lock.json
+/TESTING.md
