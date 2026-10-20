@@ -1,0 +1,41 @@
+name: Windows
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: cargo fmt --check
+      - run: cargo test --locked
+      - run: cargo clippy --locked --all-targets -- -D warnings
+      - run: cargo build --release --locked
+      - run: node tests/release.mjs
+      - run: npm ci
+      - run: npm test
+      - run: npm run test:integration
+      - run: npx playwright install chromium
+      - run: npm run test:ui
+        env:
+          OM_BROWSER_CHANNEL: chromium
+      - shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path dist -Force | Out-Null
+          Copy-Item -LiteralPath target/release/ncm-overlay-control.exe -Destination dist/NCMOverlayControl.exe
+          Get-FileHash -LiteralPath dist/NCMOverlayControl.exe -Algorithm SHA256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NCMOverlayControl-windows-x64
+          path: dist/NCMOverlayControl.exe

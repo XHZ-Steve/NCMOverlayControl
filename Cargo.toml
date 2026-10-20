@@ -1,0 +1,23 @@
+[package]
+name = "ncm-overlay-control"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/XHZ-Steve/NCMOverlayControl"
+description = "Portable local music controls for Steam Overlay"
+
+[dependencies]
+serde_json = "1"
+tungstenite = "0.28"
+tiny_http = "0.12"
+rand = "0.9"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61.2", features = ["Win32_UI_Input_KeyboardAndMouse", "Win32_UI_WindowsAndMessaging", "Win32_UI_Shell", "Win32_System_LibraryLoader", "Win32_System_Threading", "Win32_System_Registry", "Win32_Security", "Win32_Graphics_Gdi"] }
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"

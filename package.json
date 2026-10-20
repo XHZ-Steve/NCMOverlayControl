@@ -1,0 +1,1 @@
+{"name":"ncm-overlay-control-tests","private":true,"version":"0.1.0","scripts":{"test":"node test-adapter.mjs && node test-controls.mjs && node test-fallback.mjs","test:ui":"node test-web-modes-ui.mjs && node tests/settings-ui.mjs","test:integration":"node test-custom-ports.mjs && node tests/settings-api.mjs"},"devDependencies":{"playwright":"1.62.1"}}
