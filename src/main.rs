@@ -270,7 +270,8 @@ fn connect(tx: mpsc::Sender<Event>, generation: u64, debug_port: u16) -> Result<
     })
 }
 fn handle_wire(v: &Value, shared: &Shared) {
-    if v["method"] == "Runtime.bindingCalled" && v["params"]["name"] == "__overlayMusicNotify" {
+    if v["method"] == "Runtime.bindingCalled" && v["params"]["name"] == "__ncmOverlayControlNotify"
+    {
         if let Some(s) = v["params"]["payload"].as_str() {
             if let Ok(state) = serde_json::from_str(s) {
                 shared.publish(state);
@@ -354,7 +355,7 @@ fn initialize(
         pending,
         shared,
         "Runtime.addBinding",
-        json!({"name":"__overlayMusicNotify"}),
+        json!({"name":"__ncmOverlayControlNotify"}),
     )?;
     evaluate(cdp, rx, pending, shared, include_str!("../web/adapter.js"))
 }
@@ -397,7 +398,7 @@ fn worker(
                         &rx,
                         &mut pending,
                         &shared,
-                        "(window.__overlayMusicBridge?.dispose(),true)",
+                        "(window.__ncmOverlayControlBridge?.dispose(),true)",
                     );
                 }
                 debug_port = DEBUG_PORT.load(Ordering::Relaxed);
@@ -413,7 +414,7 @@ fn worker(
                         &rx,
                         &mut pending,
                         &shared,
-                        "(window.__overlayMusicBridge?.dispose(),true)",
+                        "(window.__ncmOverlayControlBridge?.dispose(),true)",
                     );
                 }
                 let _ = reply.send(());
@@ -444,7 +445,7 @@ fn worker(
                         &rx,
                         &mut pending,
                         &shared,
-                        "(window.__overlayMusicBridge?.dispose(),true)",
+                        "(window.__ncmOverlayControlBridge?.dispose(),true)",
                     );
                 }
             }
@@ -508,7 +509,7 @@ fn worker(
                             &rx,
                             &mut pending,
                             &shared,
-                            "window.__overlayMusicBridge.snapshot()",
+                            "window.__ncmOverlayControlBridge.snapshot()",
                         );
                         match before {
                             Ok(before) => {
@@ -518,7 +519,7 @@ fn worker(
                                 }
                                 let send_error = media::send(value.as_str().unwrap()).err();
                                 format!(
-                                    "window.__overlayMusicBridge.finishMedia({},{},{})",
+                                    "window.__ncmOverlayControlBridge.finishMedia({},{},{})",
                                     value,
                                     before,
                                     json!(send_error)
@@ -535,13 +536,13 @@ fn worker(
                         }
                     } else {
                         format!(
-                            "window.__overlayMusicBridge.command({},{})",
+                            "window.__ncmOverlayControlBridge.command({},{})",
                             json!(cmd),
                             value
                         )
                     }
                 } else {
-                    "(window.__overlayMusicBridge?.touch(),window.__overlayMusicBridge?.snapshot())"
+                    "(window.__ncmOverlayControlBridge?.touch(),window.__ncmOverlayControlBridge?.snapshot())"
                         .into()
                 };
                 let result = evaluate(c, &rx, &mut pending, &shared, &expression);

@@ -1,6 +1,6 @@
 (() => {
  'use strict';
- const KEY = '__overlayMusicBridge';
+ const KEY = '__ncmOverlayControlBridge';
  window[KEY]?.dispose?.();
  const root = document.getElementById('root');
  let store = root?._reactRootContainer?._internalRoot?.current?.child?.child?.memoizedProps?.store;
@@ -31,9 +31,9 @@
  let last = '', timer, lease;
  const publish = () => {
    timer = undefined;
-   if(typeof window.__overlayMusicNotify !== 'function'){dispose();return;}
+   if(typeof window.__ncmOverlayControlNotify !== 'function'){dispose();return;}
    const value = JSON.stringify(snapshot());
-   if (value !== last) { last = value; window.__overlayMusicNotify(value); }
+   if (value !== last) { last = value; window.__ncmOverlayControlNotify(value); }
  };
  const schedule = () => { if (!timer) timer = setTimeout(publish, 60); };
  const unsubscribe = store.subscribe(schedule);

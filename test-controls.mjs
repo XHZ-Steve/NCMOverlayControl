@@ -16,7 +16,7 @@ await vm.runInContext("send('toggle',undefined,$('toggle'))",context);
 assert.deepEqual(requests[0],{command:'toggle',transport:'windows'});
 assert.equal(vm.runInContext('state.connected',context),false,'media ACK must not overwrite real NCM state');
 node('transport').value='ncm';node('transport').listeners.change();
-assert.equal(storage.get('overlayMusic.transport'),'ncm');assert.equal(node('toggle').disabled,true);
+assert.equal(storage.get('ncmOverlayControl.transport'),'ncm');assert.equal(node('toggle').disabled,true);
 vm.runInContext("render({connected:true,title:'Test',volume:100,playing:true,canAI:true,canLike:true});",context);
 await vm.runInContext("send('next',undefined,$('next'))",context);
 assert.deepEqual(requests[1],{command:'next',transport:'ncm'});

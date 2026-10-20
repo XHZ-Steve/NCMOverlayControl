@@ -2,7 +2,7 @@
 const $ = id => document.getElementById(id);
 let token, source, state = {connected:false}, busy = false, paused = false, stopped = false, starting = false, reconnect, pendingVolume, volumeRunning = false;
 let transport='windows', serviceAvailable=false;
-try {if(localStorage.getItem('overlayMusic.transport')==='ncm') transport='ncm';} catch {}
+try {if(localStorage.getItem('ncmOverlayControl.transport')==='ncm') transport='ncm';} catch {}
 $('transport').value=transport;
 const mediaCommands=new Set(['previous','next','toggle']);
 function error(text) { $('error').textContent = text || ''; }
@@ -55,7 +55,7 @@ async function send(command,value,element) {
  finally {clearTimeout(timeout);busy=false;render(state);if(element)setTimeout(()=>delete element.dataset.state,1500);}
 }
 for(const el of document.querySelectorAll('[data-command]'))el.addEventListener('click',()=>send(el.dataset.command,undefined,el));
-$('transport').addEventListener('change',()=>{transport=$('transport').value;try{localStorage.setItem('overlayMusic.transport',transport);}catch{}error('');render(state);});
+$('transport').addEventListener('change',()=>{transport=$('transport').value;try{localStorage.setItem('ncmOverlayControl.transport',transport);}catch{}error('');render(state);});
 $('mode').addEventListener('change',()=>send('mode',$('mode').value,$('mode')));
 async function drainVolume() {
  if(volumeRunning)return;volumeRunning=true;

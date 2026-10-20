@@ -8,9 +8,9 @@ function fixture(){
   const store={getState:()=>({playing:p}),subscribe:()=>()=>{},dispatch:action=>{dispatches.push(action);p.playingState=action.type==='playing/pause'?1:2;}};
   const button={getClientRects:()=>[1],closest:()=>null,querySelector:()=>null,getAttribute:()=>null,click:()=>{clicks++;p.resourceTrackId='song-2';}};
   const root={_reactRootContainer:{_internalRoot:{current:{child:{child:{memoizedProps:{store}}}}}}};
-  const context={window:{__overlayMusicNotify(){}},document:{getElementById:()=>root,querySelectorAll:()=>[button]},MutationObserver:class{observe(){}disconnect(){}},clearTimeout(){},setTimeout(fn,ms){if(ms<10000)queueMicrotask(()=>{if(ms===150)hook?.();fn();});return 1;}};
+  const context={window:{__ncmOverlayControlNotify(){}},document:{getElementById:()=>root,querySelectorAll:()=>[button]},MutationObserver:class{observe(){}disconnect(){}},clearTimeout(){},setTimeout(fn,ms){if(ms<10000)queueMicrotask(()=>{if(ms===150)hook?.();fn();});return 1;}};
   vm.createContext(context);vm.runInContext(code,context);
-  return{p,bridge:context.window.__overlayMusicBridge,dispatches,get clicks(){return clicks;},set hook(fn){hook=fn;}};
+  return{p,bridge:context.window.__ncmOverlayControlBridge,dispatches,get clicks(){return clicks;},set hook(fn){hook=fn;}};
 }
 {
   const f=fixture(),before=f.bridge.snapshot();
